@@ -1,0 +1,468 @@
+// // godo this serves as a way to list all incomplete and is an alias for godo --list
+// // godo --add by itself opens your editor to create a new item that way  godo --add "title" creates a new item with no notes
+// // godo --edit <hash> will open your editor to edit an existing item godo --edit <hash> "title" will overwrite the title of an existing item
+// // godo --done <hash> marks it as done godo --done by itself should open an interactive cli to select an item to mark as done
+// // godo list mode <mode>  should show all items in that mode and the mode flag should be usable in --add as well
+// // The user should be able to set a default mode which is saved to .config/godo/config.yaml or some shit
+// // godo --delete <hash> should be the only way to delete an item and should default to soft delete, sending the item to the deleted mode, godo --delete --hard <hash> should be possible but prompt the user to be damn sure
+// // godo --cloudsave maybe to add commit push all items to an remote git repo with some additional commands for pulling, initialization, pushing, etc
+
+// package main
+
+// import (
+// 	"database/sql"
+// 	"fmt"
+// 	"log"
+// 	"os"
+// 	"os/exec"
+
+// 	"github.com/jessevdk/go-flags"
+// 	_ "github.com/mattn/go-sqlite3"
+// )
+
+// var db *sql.DB
+
+// // Person struct to hold data
+// type Person struct {
+// 	ID   int
+// 	Name string
+// 	Age  int
+// }
+
+// // Command-line options and subcommands
+// type Options struct {
+// 	List   ListCommand   `command:"list" description:"List all todo items"`
+// 	Get    GetCommand    `command:"get" description:"Get a todo item by ID"`
+// 	Edit   EditCommand   `command:"edit" description:"Edit a todo item by ID"`
+// 	Delete DeleteCommand `command:"delete" description:"Delete a todo item by ID"`
+// 	Add    AddCommand    `command:"add" description:"Add a new todo item"`
+// }
+
+// type AddCommand struct {
+// 	Value string `short:"a" long:"add" description:"Value of the todo item"`
+// }
+
+// // ListCommand for listing all people
+// type ListCommand struct {
+// 	Mode string `short:"m" long:"mode" description:"Mode of the todo item"`
+// }
+
+// // GetCommand for retrieving a person by ID
+// type GetCommand struct {
+// 	ID int `short:"i" long:"id" description:"ID of the todo item" required:"true"`
+// }
+
+// // EditCommand for updating a todo item
+// type EditCommand struct {
+// 	ID int `short:"i" long:"id" description:"ID of the todo item" required:"true"`
+// }
+
+// // DeleteCommand for deleting a todo item by ID
+// type DeleteCommand struct {
+// 	ID int `short:"i" long:"id" description:"ID of the todo item" required:"true"`
+// }
+
+// func main() {
+// 	// Open or create SQLite database
+// 	var err error
+// 	db, err = sql.Open("sqlite3", "./todos.db")
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
+// 	defer db.Close()
+
+// 	// Create table if it doesn't exist
+// 	createTable()
+
+// 	// Set up command parsing
+// 	var opts Options
+// 	parser := flags.NewParser(&opts, flags.Default)
+
+// 	// Parse the arguments and execute the corresponding command
+// 	// Parse the arguments and check if a subcommand was provided
+// 	if _, err := parser.Parse(); err != nil {
+// 		if flags.WroteHelp(err) {
+// 			// If help was requested, exit gracefully
+// 			os.Exit(0)
+// 		}
+// 		// No command provided, default to list
+// 		_ = (&ListCommand{}).Execute(nil)
+// 	} else if len(os.Args) == 1 {
+// 		// If no arguments were provided, run list by default
+// 		_ = (&ListCommand{}).Execute(nil)
+// 	}
+// }
+
+// // Create a table
+// func createTable() {
+// 	createTableSQL := `CREATE TABLE IF NOT EXISTS todos (
+// 		"id" INTEGER PRIMARY KEY AUTOINCREMENT,
+// 		"description" TEXT,
+// 		"status" TEXT,
+// 		"notes" TEXT,
+// 		"created_at" TEXT
+// 	);`
+
+// 	_, err := db.Exec(createTableSQL)
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
+// }
+
+// // Execute method for ListCommand
+// func (l *ListCommand) Execute(args []string) error {
+// 	fmt.Println("List of todo items:")
+// 	return nil
+// }
+
+// // Execute method for GetCommand
+// func (g *GetCommand) Execute(args []string) error {
+// 	return nil
+// }
+
+// // Execute method for EditCommand
+// func (e *EditCommand) Execute(args []string) error {
+// 	return nil
+// }
+
+// // Execute method for DeleteCommand
+// func (d *DeleteCommand) Execute(args []string) error {
+// 	return nil
+// }
+
+// // Execute method for AddCommand
+// func (a *AddCommand) Execute(args []string) error {
+// 	fmt.Println(a.Value)
+// 	// if nothing is passed to the add command open the editor
+// 	if a.Value == "" {
+// 		editorAdd()
+// 	}
+
+// 	// if something is passed to the add command add it to the database
+// 	fmt.Println("add")
+// 	return nil
+// }
+
+// func editorAdd() {
+// 	// Create a temporary file
+// 	tmpfile, err := os.CreateTemp("", "example.*.txt") //ioutil.TempFile("", "example.*.txt")
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	defer os.Remove(tmpfile.Name()) // Clean up the temp file
+
+// 	// Open the editor (vim or nano)
+// 	cmd := exec.Command("vim", tmpfile.Name())
+// 	cmd.Stdin = os.Stdin
+// 	cmd.Stdout = os.Stdout
+// 	cmd.Stderr = os.Stderr
+
+// 	if err := cmd.Run(); err != nil {
+// 		panic(err)
+// 	}
+
+// 	// Read the content of the temporary file
+// 	content, err := os.ReadFile(tmpfile.Name())
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	fmt.Println(string(content))
+// }
+
+package main
+
+import (
+	"database/sql"
+	"fmt"
+	"os"
+	"os/exec"
+	"os/user"
+	"strings"
+
+	"github.com/jessevdk/go-flags"
+	_ "github.com/mattn/go-sqlite3"
+	"github.com/mitchellh/go-homedir"
+	"gopkg.in/yaml.v2"
+)
+
+const (
+	configFile = ".config/godo/config.yaml"
+)
+
+type taskManager struct {
+	db *sql.DB
+}
+
+type Config struct {
+	DefaultMode string `yaml:"default_mode"`
+}
+
+type Options struct {
+	List      ListCommand      `command:"list" description:"List tasks"`
+	Add       AddCommand       `command:"add" description:"Add a new task"`
+	Edit      EditCommand      `command:"edit" description:"Edit an existing task"`
+	Done      DoneCommand      `command:"done" description:"Mark a task as done"`
+	Delete    DeleteCommand    `command:"delete" description:"Delete a task"`
+	CloudSave CloudSaveCommand `command:"cloudsave" description:"Save tasks to the cloud"`
+}
+
+type ListCommand struct{}
+type AddCommand struct {
+	Title string `positional-arg-name:"title"`
+}
+type EditCommand struct {
+	ID    string `positional-arg-name:"id"`
+	Title string `positional-arg-name:"title"`
+}
+type DoneCommand struct {
+	ID string `positional-arg-name:"id"`
+}
+type DeleteCommand struct {
+	ID   string `positional-arg-name:"id"`
+	Hard bool   `short:"H" long:"hard" description:"Hard delete"`
+}
+type CloudSaveCommand struct{}
+
+var db *sql.DB
+var config Config
+
+func main() {
+	db, err := sql.Open("sqlite3", "./todo.db")
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+
+	initDB(db)
+
+	parser := flags.NewParser(&Options{}, flags.Default)
+	_, err = parser.Parse()
+	if err != nil {
+		os.Exit(1)
+	}
+}
+
+func initDB(db *sql.DB) {
+	sqlStmt := `
+    CREATE TABLE IF NOT EXISTS tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT,
+        notes TEXT,
+        status TEXT,
+        mode TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    `
+	_, err := db.Exec(sqlStmt)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func loadConfig() {
+	_, err := user.Current()
+	if err != nil {
+		panic(err)
+	}
+	configPath, err := homedir.Expand(configFile)
+	if err != nil {
+		panic(err)
+	}
+	f, err := os.Open(configPath)
+	if err == nil {
+		defer f.Close()
+		decoder := yaml.NewDecoder(f)
+		err = decoder.Decode(&config)
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+
+func (cmd *ListCommand) Execute(args []string) error {
+	loadConfig()
+	listTasks("")
+	return nil
+}
+
+func (cmd *AddCommand) Execute(args []string) error {
+	loadConfig()
+	// taskManager := &taskManager{db: db}
+
+	// taskManager.addTask(db, cmd.Title)
+	_, err := db.Exec("INSERT INTO tasks (title) VALUES ($1)", cmd.Title)
+	if err != nil {
+		panic(err)
+	}
+	return nil
+}
+
+func (cmd *EditCommand) Execute(args []string) error {
+	loadConfig()
+	editTask(cmd.ID, cmd.Title)
+	return nil
+}
+
+func (cmd *DoneCommand) Execute(args []string) error {
+	markDone(cmd.ID)
+	return nil
+}
+
+func (cmd *DeleteCommand) Execute(args []string) error {
+	deleteTask(cmd.ID, cmd.Hard)
+	return nil
+}
+
+func (cmd *CloudSaveCommand) Execute(args []string) error {
+	cloudSave()
+	return nil
+}
+
+func listTasks(mode string) {
+	var rows *sql.Rows
+	var err error
+	if mode == "" {
+		rows, err = db.Query("SELECT id, title, status FROM tasks")
+	} else {
+		rows, err = db.Query("SELECT id, title, status FROM tasks WHERE status = ?", mode)
+	}
+	if err != nil {
+		panic(err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id int
+		var title, status string
+		err := rows.Scan(&id, &title, &status)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("[%d] %s (%s)\n", id, title, status)
+	}
+	err = rows.Err()
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (tm *taskManager) addTask(db *sql.DB, title string) {
+	var notes, mode string
+	if title == "" {
+		editor := os.Getenv("EDITOR")
+		if editor == "" {
+			editor = "vi"
+		}
+		tmpfile, err := os.CreateTemp("", "task")
+		if err != nil {
+			panic(err)
+		}
+		defer os.Remove(tmpfile.Name())
+
+		cmd := exec.Command(editor, tmpfile.Name())
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		err = cmd.Run()
+		if err != nil {
+			panic(err)
+		}
+
+		content, err := os.ReadFile(tmpfile.Name())
+		if err != nil {
+			panic(err)
+		}
+
+		lines := strings.SplitN(string(content), "\n", 2)
+		title = lines[0]
+		if len(lines) > 1 {
+			notes = lines[1]
+		}
+		mode = config.DefaultMode
+	}
+
+	_, err := db.Exec("INSERT INTO tasks (title, notes, status, mode) VALUES (?, ?, ?, ?)", title, notes, "incomplete", mode)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func editTask(id, title string) {
+	if title == "" {
+		editor := os.Getenv("EDITOR")
+		if editor == "" {
+			editor = "vi"
+		}
+		tmpfile, err := os.CreateTemp("", "task")
+		if err != nil {
+			panic(err)
+		}
+		defer os.Remove(tmpfile.Name())
+
+		var notes string
+		err = db.QueryRow("SELECT notes FROM tasks WHERE id = ?", id).Scan(&notes)
+		if err != nil {
+			panic(err)
+		}
+		err = os.WriteFile(tmpfile.Name(), []byte(notes), 0644)
+		if err != nil {
+			panic(err)
+		}
+
+		cmd := exec.Command(editor, tmpfile.Name())
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		err = cmd.Run()
+		if err != nil {
+			panic(err)
+		}
+
+		content, err := os.ReadFile(tmpfile.Name())
+		if err != nil {
+			panic(err)
+		}
+
+		title = string(content)
+	}
+
+	_, err := db.Exec("UPDATE tasks SET title = ? WHERE id = ?", title, id)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func markDone(id string) {
+	_, err := db.Exec("UPDATE tasks SET status = ? WHERE id = ?", "done", id)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func deleteTask(id string, hard bool) {
+	if hard {
+		var confirm string
+		fmt.Printf("Are you sure you want to hard delete task %s? Type 'yes' to confirm: ", id)
+		fmt.Scanln(&confirm)
+		if confirm != "yes" {
+			fmt.Println("Aborting hard delete")
+			return
+		}
+	}
+
+	var status string
+	if hard {
+		status = "deleted"
+	} else {
+		status = "soft-deleted"
+	}
+
+	_, err := db.Exec("UPDATE tasks SET status = ? WHERE id = ?", status, id)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func cloudSave() {
+	fmt.Println("Cloud save not implemented yet")
+}
