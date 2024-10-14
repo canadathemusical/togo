@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 
 	"golang.org/x/term"
@@ -33,7 +35,12 @@ type AddCommand struct {
 type ListCommand struct{}
 
 func (cmd *ListCommand) Execute(args []string) error {
-	db, err := sql.Open("sqlite3", "./todo.db")
+	dbPath, err := getDBPath()
+	if err != nil {
+		panic(err)
+	}
+
+	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		panic(err)
 	}
@@ -80,6 +87,11 @@ func (cmd *ListCommand) Execute(args []string) error {
 }
 
 func (cmd *AddCommand) Execute(args []string) error {
+	dbPath, err := getDBPath()
+	if err != nil {
+		panic(err)
+	}
+
 	// how do I get the argument after add?
 
 	status := "ACTIVE"
@@ -87,7 +99,7 @@ func (cmd *AddCommand) Execute(args []string) error {
 	notes := ""
 
 	fmt.Println(cmd.Title)
-	db, err := sql.Open("sqlite3", "./todo.db")
+	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		panic(err)
 	}
@@ -106,9 +118,14 @@ func (cmd *AddCommand) Execute(args []string) error {
 }
 
 func (cmd *DoneCommand) Execute(args []string) error {
+	dbPath, err := getDBPath()
+	if err != nil {
+		panic(err)
+	}
+
 	// how do I get the argument after done?
 
-	db, err := sql.Open("sqlite3", "./todo.db")
+	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		panic(err)
 	}
@@ -129,7 +146,12 @@ func (cmd *DoneCommand) Execute(args []string) error {
 }
 
 func main() {
-	db, err := sql.Open("sqlite3", "./todo.db")
+	dbPath, err := getDBPath()
+	if err != nil {
+		panic(err)
+	}
+
+	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		panic(err)
 	}
@@ -192,4 +214,39 @@ func wrapText(text string) (string, error) {
 	}
 
 	return result.String(), nil
+}
+
+// Function to get the configuration directory based on OS
+func getConfigDir() (string, error) {
+	var configDir string
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("could not determine home directory: %w", err)
+	}
+
+	switch runtime.GOOS {
+	case "windows":
+		configDir = filepath.Join(homeDir, "AppData", "Local", "togo")
+	case "darwin":
+		configDir = filepath.Join(homeDir, "Library", "Application Support", "togo")
+	default: // Unix-like systems
+		configDir = filepath.Join(homeDir, ".config", "togo")
+	}
+
+	return configDir, nil
+}
+
+// Function to get the path to the database file
+func getDBPath() (string, error) {
+	configDir, err := getConfigDir()
+	if err != nil {
+		return "", err
+	}
+
+	// Ensure the directory exists
+	if err := os.MkdirAll(configDir, os.ModePerm); err != nil {
+		return "", fmt.Errorf("error creating config directory: %w", err)
+	}
+
+	return filepath.Join(configDir, "todo.db"), nil
 }
