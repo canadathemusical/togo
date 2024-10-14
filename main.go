@@ -1,9 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"database/sql"
 	"fmt"
 	"os"
+	"strings"
+
+	"golang.org/x/term"
 
 	"github.com/jessevdk/go-flags"
 	_ "github.com/mattn/go-sqlite3"
@@ -52,7 +56,11 @@ func (cmd *ListCommand) Execute(args []string) error {
 			panic(err)
 		}
 		if status == "ACTIVE" {
-			fmt.Printf("[%d] %s \n", id, title)
+			text, err := wrapText(fmt.Sprintf("[%d] %s \n", id, title))
+			if err != nil {
+				panic(err)
+			}
+			fmt.Println(text)
 		}
 		activeTasks = true
 	}
@@ -61,7 +69,12 @@ func (cmd *ListCommand) Execute(args []string) error {
 		panic(err)
 	}
 	if !activeTasks {
-		fmt.Println("You have nothing to do")
+		text, err := wrapText("You have nothing to do")
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(text)
+
 	}
 	return nil
 }
@@ -150,4 +163,33 @@ func main() {
 	if err != nil {
 		os.Exit(1)
 	}
+}
+
+func wrapText(text string) (string, error) {
+	// Get the terminal size
+	width, _, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil {
+		return "", fmt.Errorf("error getting terminal size: %w", err)
+	}
+
+	var result strings.Builder
+	scanner := bufio.NewScanner(strings.NewReader(text))
+	scanner.Split(bufio.ScanWords)
+
+	lineLength := 0
+	for scanner.Scan() {
+		word := scanner.Text()
+		if lineLength+len(word)+1 > width {
+			result.WriteString("\n")
+			lineLength = 0
+		}
+		if lineLength > 0 {
+			result.WriteString(" ")
+			lineLength++
+		}
+		result.WriteString(word)
+		lineLength += len(word)
+	}
+
+	return result.String(), nil
 }
