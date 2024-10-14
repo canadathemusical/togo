@@ -26,11 +26,9 @@ type AddCommand struct {
 	Title string `positional-arg-name:"title"`
 }
 
-type ListCommand struct {
-}
+type ListCommand struct{}
 
 func (cmd *ListCommand) Execute(args []string) error {
-
 	db, err := sql.Open("sqlite3", "./todo.db")
 	if err != nil {
 		panic(err)
@@ -140,11 +138,11 @@ func main() {
 	}
 
 	// if there are no args, run list command
-	if len(os.Args) == 1 {
-		for _, arg := range os.Args {
-			fmt.Println(arg)
-		}
-	}
+	//	if len(os.Args) == 1 {
+	//		for _, arg := range os.Args {
+	//			fmt.Println(arg)
+	//		}
+	//	}
 
 	// Set up command parsing
 	parser := flags.NewParser(&Options{}, flags.Default)
@@ -152,5 +150,4 @@ func main() {
 	if err != nil {
 		os.Exit(1)
 	}
-
 }
