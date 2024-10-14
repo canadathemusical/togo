@@ -139,6 +139,14 @@ func main() {
 		panic(err)
 	}
 
+	// if there are no args, run list command
+	if len(os.Args) == 1 {
+		for _, arg := range os.Args {
+			fmt.Println(arg)
+		}
+	}
+
+	// Set up command parsing
 	parser := flags.NewParser(&Options{}, flags.Default)
 	_, err = parser.Parse()
 	if err != nil {
