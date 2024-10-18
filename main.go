@@ -16,133 +16,12 @@ import (
 )
 
 type Options struct {
-	List ListCommand `command:"list" description:"List tasks"`
-	Add  AddCommand  `command:"add" description:"Add a new task"`
-	// Edit      EditCommand      `command:"edit" description:"Edit an existing task"`
-	// Delete    DeleteCommand    `command:"delete" description:"Delete a task"`
+	List   ListCommand   `command:"list" description:"List tasks"`
+	Add    AddCommand    `command:"add" description:"Add a new task"`
+	Edit   EditCommand   `command:"edit" description:"Edit an existing task"`
+	Delete DeleteCommand `command:"delete" description:"Delete a task"`
 	// CloudSave CloudSaveCommand `command:"cloudsave" description:"Save tasks to the cloud"`
 	Done DoneCommand `command:"done" description:"Mark a task as done"`
-}
-
-type DoneCommand struct {
-	ID string `positional-arg-name:"id"`
-}
-
-type AddCommand struct {
-	Title string `positional-arg-name:"title"`
-}
-
-type ListCommand struct{}
-
-func (cmd *ListCommand) Execute(args []string) error {
-	dbPath, err := getDBPath()
-	if err != nil {
-		panic(err)
-	}
-
-	db, err := sql.Open("sqlite3", dbPath)
-	if err != nil {
-		panic(err)
-	}
-	defer db.Close()
-
-	sqlStmt := `SELECT id, title, status FROM tasks WHERE status = "ACTIVE"`
-	rows, err := db.Query(sqlStmt)
-	if err != nil {
-		panic(err)
-	}
-	defer rows.Close()
-
-	//  if there are no active tasks print "you have nothing to do"
-	activeTasks := false
-	for rows.Next() {
-		var id int
-		var title, status string
-		err := rows.Scan(&id, &title, &status)
-		if err != nil {
-			panic(err)
-		}
-		if status == "ACTIVE" {
-			text, err := wrapText(fmt.Sprintf("[%d] %s \n", id, title))
-			if err != nil {
-				panic(err)
-			}
-			fmt.Println(text)
-		}
-		activeTasks = true
-	}
-	err = rows.Err()
-	if err != nil {
-		panic(err)
-	}
-	if !activeTasks {
-		text, err := wrapText("You have nothing to do")
-		if err != nil {
-			panic(err)
-		}
-		fmt.Println(text)
-
-	}
-	return nil
-}
-
-func (cmd *AddCommand) Execute(args []string) error {
-	dbPath, err := getDBPath()
-	if err != nil {
-		panic(err)
-	}
-
-	// how do I get the argument after add?
-
-	status := "ACTIVE"
-	mode := "default"
-	notes := ""
-
-	fmt.Println(cmd.Title)
-	db, err := sql.Open("sqlite3", dbPath)
-	if err != nil {
-		panic(err)
-	}
-	defer db.Close()
-
-	sqlStmt := `INSERT INTO tasks(title, notes, status, mode) VALUES(?, ?, ?, ?)`
-
-	for _, title := range args {
-
-		_, err = db.Exec(sqlStmt, title, notes, status, mode)
-		if err != nil {
-			panic(err)
-		}
-	}
-	return nil
-}
-
-func (cmd *DoneCommand) Execute(args []string) error {
-	dbPath, err := getDBPath()
-	if err != nil {
-		panic(err)
-	}
-
-	// how do I get the argument after done?
-
-	db, err := sql.Open("sqlite3", dbPath)
-	if err != nil {
-		panic(err)
-	}
-	defer db.Close()
-
-	for _, id := range args {
-		stmt, err := db.Prepare("UPDATE tasks SET status = ? WHERE id = ?")
-		if err != nil {
-			panic(err)
-		}
-		_, err = stmt.Exec("DONE", id)
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	return nil
 }
 
 func main() {
@@ -172,12 +51,15 @@ func main() {
 		panic(err)
 	}
 
-	// if there are no args, run list command
-	//	if len(os.Args) == 1 {
-	//		for _, arg := range os.Args {
-	//			fmt.Println(arg)
-	//		}
-	//	}
+	// if no flags have been used, show the list of tasks
+	if len(os.Args) == 1 {
+		cmd := &ListCommand{}
+		err := cmd.Execute(nil)
+		if err != nil {
+			panic(err)
+		}
+		return
+	}
 
 	// Set up command parsing
 	parser := flags.NewParser(&Options{}, flags.Default)
